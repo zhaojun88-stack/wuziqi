@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋游戏</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2D3748',
+                        secondary: '#E2E8F0',
+                        board: '#FFFFFF',
+                        black: '#000000',
+                        white: '#FFFFFF',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .board-grid {
+                background-size: 100% 100%;
+                background-image: linear-gradient(to right, rgba(0,0,0,0.8) 1px, transparent 1px),
+                                  linear-gradient(to bottom, rgba(0,0,0,0.8) 1px, transparent 1px);
+            }
+            .piece-shadow {
+                filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.07)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.06));
+            }
+            .piece-transition {
+                transition: all 0.2s ease-out;
+            }
+            .btn-hover {
+                transition: all 0.2s ease;
+            }
+            .btn-hover:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+    <div class="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div class="bg-primary text-white p-6 text-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold">五子棋挑战，你敢来吗？</h1>
+            <p class="text-gray-300 mt-2">一款经典的对弈游戏</p>
+        </div>
+        
+        <div class="p-6 md:p-8 flex flex-col md:flex-row gap-6">
+            <!-- 游戏区域 -->
+            <div class="flex-1 relative">
+                <div class="aspect-square bg-board rounded-lg shadow-lg overflow-hidden board-grid border border-gray-200" style="background-size: calc(100% / 14) calc(100% / 14);">
+                    <canvas id="gameCanvas" class="w-full h-full cursor-pointer"></canvas>
+                </div>
+                
+                <div id="gameStatus" class="mt-4 p-3 bg-gray-100 rounded-lg text-center">
+                    <p id="statusText" class="font-medium">游戏开始! 黑棋先行</p>
+                </div>
+            </div>
+            
+            <!-- 游戏控制和信息 -->
+            <div class="w-full md:w-80 flex flex-col gap-6">
+                <div class="bg-gray-50 rounded-lg p-5 shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa-solid fa-info-circle mr-2 text-gray-700"></i>游戏信息
+                    </h2>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">玩家角色</span>
+                            <div class="flex items-center">
+                                <div class="w-6 h-6 rounded-full bg-black mr-2 piece-shadow"></div>
+                                <span>黑棋 (您)</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">AI角色</span>
+                            <div class="flex items-center">
+                                <div class="w-6 h-6 rounded-full bg-white border border-gray-300 mr-2 piece-shadow"></div>
+                                <span>白棋 (AI)</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">当前回合</span>
+                            <div class="flex items-center">
+                                <div id="currentPlayer" class="w-6 h-6 rounded-full bg-black mr-2 piece-shadow"></div>
+                                <span id="playerText">黑棋 (您)</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">游戏时间</span>
+                            <span id="gameTime" class="font-mono">00:00</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">步数</span>
+                            <span id="moveCount">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-5 shadow-sm">
+                    <h2 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fa-solid fa-history mr-2 text-gray-700"></i>游戏记录
+                    </h2>
+                    <div id="gameRecords" class="space-y-3">
+                        <div id="noRecords" class="text-center text-gray-500 py-4">
+                            <i class="fa-solid fa-clipboard-list text-2xl mb-2 block"></i>
+                            <p>暂无游戏记录</p>
+                            <p class="text-xs mt-1">完成游戏后记录将显示在这里</p>
+                        </div>
+                        <div id="recentRecords" class="hidden space-y-2">
+                            <!-- 最近记录将在这里动态生成 -->
+                        </div>
+                        <div id="statsSummary" class="hidden pt-3 border-t border-gray-200">
+                            <div class="flex items-center justify-between text-sm font-medium">
+                                <span>玩家战绩:</span>
+                                <div class="flex items-center gap-4">
+                                    <span class="text-green-600"><i class="fa-solid fa-check-circle mr-1"></i><span id="winsCount">0</span>胜</span>
+                                    <span class="text-red-600"><i class="fa-solid fa-times-circle mr-1"></i><span id="lossesCount">0</span>败</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="viewAllRecordsBtn" class="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium btn-hover hidden">
+                        <i class="fa-solid fa-list-ul mr-2"></i>查看所有记录
+                    </button>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button id="restartBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 px-4 rounded-lg font-medium btn-hover flex items-center justify-center hidden">
+                        <i class="fa-solid fa-refresh mr-2"></i>重新开始
+                    </button>
+                    <button id="pauseBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 px-4 rounded-lg font-medium btn-hover flex items-center justify-center">
+                        <i class="fa-solid fa-pause mr-2"></i>暂停
+                    </button>
+                    <button id="resumeBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium btn-hover flex items-center justify-center hidden">
+                        <i class="fa-solid fa-play mr-2"></i>继续
+                    </button>
+                    <button id="undoBtn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium btn-hover flex items-center justify-center" title="剩余悔棋次数: 3">
+                        <i class="fa-solid fa-undo mr-2"></i>悔棋 (3)
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+
+    </div>
+
+    <!-- 查看所有记录模态框 -->
+    <div id="allRecordsModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[80vh] mx-4 transform transition-transform duration-300 scale-95 overflow-hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold flex items-center">
+                    <i class="fa-solid fa-list-ul mr-2 text-gray-700"></i>
+                    所有游戏记录
+                </h3>
+                <button id="closeRecordsModal" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto max-h-[60vh]">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm font-semibold text-gray-600 pb-2 border-b">
+                    <div>日期时间</div>
+                    <div class="text-center">结果</div>
+                    <div class="text-right">用时 / 步数</div>
+                </div>
+                
+                <div id="allRecordsList" class="space-y-2">
+                    <!-- 所有记录将在这里动态生成 -->
+                </div>
+                
+                <div id="noRecordsMessage" class="text-center text-gray-500 py-8 hidden">
+                    <i class="fa-solid fa-clipboard-list text-4xl mb-3 block"></i>
+                    <p>暂无游戏记录</p>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    共 <span id="totalRecordsCount">0</span> 场游戏
+                </div>
+                <button id="clearRecordsBtn" class="bg-red-100 hover:bg-red-200 text-red-700 py-2 px-4 rounded-lg text-sm font-medium btn-hover">
+                    <i class="fa-solid fa-trash-can mr-2"></i>清空记录
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 胜利提示模态框 -->
+    <div id="winModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4 transform transition-transform duration-300 scale-95">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-trophy text-3xl text-yellow-500"></i>
+                </div>
+                <h2 class="text-2xl font-bold mb-2" id="winnerText">黑棋获胜!</h2>
+                <p class="text-gray-600 mb-6">恭喜您赢得了这场精彩的比赛!</p>
+                <button id="newGameBtn" class="bg-gray-800 hover:bg-gray-700 text-white py-3 px-8 rounded-lg font-medium btn-hover">
+                    开始新游戏
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 游戏常量
+            const BOARD_SIZE = 15; // 15x15的棋盘
+            const CELL_SIZE = Math.min(window.innerWidth * 0.8 / BOARD_SIZE, window.innerHeight * 0.6 / BOARD_SIZE);
+            const PIECE_SIZE = CELL_SIZE * 0.8;
+            
+            // 游戏状态
+            let gameBoard = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+            let currentPlayer = 1; // 1: 黑棋(用户), 2: 白棋(AI)
+            let gameActive = true;
+            let isPaused = false;
+            let moveHistory = [];
+            let gameTime = 0;
+            let timerInterval;
+            let isAITurn = false;
+            let undoCount = 3; // 每回合最多悔棋3次
+            
+            // 游戏记录
+            let gameRecords = JSON.parse(localStorage.getItem('gobangGameRecords')) || [];
+            
+            // DOM元素
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const statusText = document.getElementById('statusText');
+            const currentPlayerEl = document.getElementById('currentPlayer');
+            const playerText = document.getElementById('playerText');
+            const moveCountEl = document.getElementById('moveCount');
+            const gameTimeEl = document.getElementById('gameTime');
+            const restartBtn = document.getElementById('restartBtn');
+            const undoBtn = document.getElementById('undoBtn');
+            const winModal = document.getElementById('winModal');
+            const winnerText = document.getElementById('winnerText');
+            const newGameBtn = document.getElementById('newGameBtn');
+            const viewAllRecordsBtn = document.getElementById('viewAllRecordsBtn');
+            
+            // 设置Canvas尺寸
+            canvas.width = CELL_SIZE * (BOARD_SIZE - 1);
+            canvas.height = CELL_SIZE * (BOARD_SIZE - 1);
+            
+            // 绘制棋盘
+            function drawBoard() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制网格线
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 1.5;
+                
+                for (let i = 0; i < BOARD_SIZE; i++) {
+                    // 水平线
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * CELL_SIZE);
+                    ctx.lineTo(canvas.width, i * CELL_SIZE);
+                    ctx.stroke();
+                    
+                    // 垂直线
+                    ctx.beginPath();
+                    ctx.moveTo(i * CELL_SIZE, 0);
+                    ctx.lineTo(i * CELL_SIZE, canvas.height);
+                    ctx.stroke();
+                }
+                
+                // 绘制天元和星位
+                const starPoints = [
+                    {x: 3, y: 3}, {x: 3, y: 11}, {x: 7, y: 7}, 
+                    {x: 11, y: 3}, {x: 11, y: 11}
+                ];
+                
+                starPoints.forEach(point => {
+                    ctx.beginPath();
+                    ctx.arc(point.x * CELL_SIZE, point.y * CELL_SIZE, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#000000';
+                    ctx.fill();
+                });
+                
+                // 绘制棋子
+                for (let i = 0; i < BOARD_SIZE; i++) {
+                    for (let j = 0; j < BOARD_SIZE; j++) {
+                        if (gameBoard[i][j] !== 0) {
+                            drawPiece(i, j, gameBoard[i][j]);
+                        }
+                    }
+                }
+            }
+            
+            // 绘制棋子
+            function drawPiece(row, col, player) {
+                const x = col * CELL_SIZE;
+                const y = row * CELL_SIZE;
+                
+                // 棋子阴影
+                ctx.beginPath();
+                ctx.arc(x, y, PIECE_SIZE / 2 + 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fill();
+                
+                // 棋子本体
+                ctx.beginPath();
+                ctx.arc(x, y, PIECE_SIZE / 2, 0, Math.PI * 2);
+                
+                if (player === 1) {
+                    // 黑棋 - 渐变效果
+                    const gradient = ctx.createRadialGradient(
+                        x - PIECE_SIZE / 6, y - PIECE_SIZE / 6, PIECE_SIZE / 10,
+                        x, y, PIECE_SIZE / 2
+                    );
+                    gradient.addColorStop(0, '#555');
+                    gradient.addColorStop(1, '#000');
+                    ctx.fillStyle = gradient;
+                } else {
+                    // 白棋 - 渐变效果
+                    const gradient = ctx.createRadialGradient(
+                        x - PIECE_SIZE / 6, y - PIECE_SIZE / 6, PIECE_SIZE / 10,
+                        x, y, PIECE_SIZE / 2
+                    );
+                    gradient.addColorStop(0, '#fff');
+                    gradient.addColorStop(1, '#ddd');
+                    ctx.fillStyle = gradient;
+                }
+                
+                ctx.fill();
+                
+                // 棋子边缘
+                ctx.strokeStyle = player === 1 ? '#333' : '#ccc';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            
+            // 检查胜利条件
+            function checkWin(row, col, player) {
+                const directions = [
+                    [1, 0],   // 水平
+                    [0, 1],   // 垂直
+                    [1, 1],   // 对角线
+                    [1, -1]   // 反对角线
+                ];
+                
+                for (const [dx, dy] of directions) {
+                    let count = 1;  // 当前位置已经有一个棋子
+                    
+                    // 正向检查
+                    for (let i = 1; i < 5; i++) {
+                        const newRow = row + i * dy;
+                        const newCol = col + i * dx;
+                        
+                        if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) {
+                            break;
+                        }
+                        
+                        if (gameBoard[newRow][newCol] === player) {
+                            count++;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // 反向检查
+                    for (let i = 1; i < 5; i++) {
+                        const newRow = row - i * dy;
+                        const newCol = col - i * dx;
+                        
+                        if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) {
+                            break;
+                        }
+                        
+                        if (gameBoard[newRow][newCol] === player) {
+                            count++;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    if (count >= 5) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }
+            
+            // 检查平局
+            function checkDraw() {
+                for (let i = 0; i < BOARD_SIZE; i++) {
+                    for (let j = 0; j < BOARD_SIZE; j++) {
+                        if (gameBoard[i][j] === 0) {
+                            return false; // 还有空位，不是平局
+                        }
+                    }
+                }
+                
+                // 保存平局记录
+                const record = {
+                    id: Date.now(),
+                    date: new Date().toLocaleString(),
+                    winner: 0, // 0表示平局
+                    gameTime: gameTime,
+                    moves: moveHistory.length,
+                    playerWon: false
+                };
+                
+                gameRecords.unshift(record);
+                localStorage.setItem('gobangGameRecords', JSON.stringify(gameRecords));
+                
+                // 更新游戏记录显示
+                updateGameRecordsDisplay();
+                
+                return true; // 棋盘已满，平局
+            }
+            
+            // 更新按钮状态
+            function updateButtonState() {
+                const restartBtn = document.getElementById('restartBtn');
+                const pauseBtn = document.getElementById('pauseBtn');
+                const resumeBtn = document.getElementById('resumeBtn');
+                
+                if (isPaused) {
+                    // 暂停状态：显示重新开始和继续按钮
+                    restartBtn.classList.remove('hidden');
+                    pauseBtn.classList.add('hidden');
+                    resumeBtn.classList.remove('hidden');
+                } else {
+                    // 正常状态：显示暂停和悔棋按钮
+                    restartBtn.classList.add('hidden');
+                    pauseBtn.classList.remove('hidden');
+                    resumeBtn.classList.add('hidden');
+                }
+                
+                // 更新悔棋按钮状态
+                undoBtn.disabled = undoCount <= 0 || !gameActive || isPaused || moveHistory.length === 0;
+                undoBtn.classList.toggle('opacity-50', undoCount <= 0 || !gameActive || isPaused || moveHistory.length === 0);
+                undoBtn.title = `剩余悔棋次数: ${undoCount}`;
+                
+                // 更新按钮上显示的次数
+                const undoIcon = undoBtn.querySelector('i');
+                undoBtn.innerHTML = '';
+                undoBtn.appendChild(undoIcon);
+                undoBtn.appendChild(document.createTextNode(`悔棋 (${undoCount})`));
+            }
+            
+            // 更新游戏状态显示
+            function updateGameStatus() {
+                if (gameActive && !isPaused) {
+                    const playerType = currentPlayer === 1 ? '黑棋 (您)' : '白棋 (AI)';
+                    statusText.textContent = `游戏进行中 - ${playerType}回合${isAITurn ? ' (AI思考中...)' : ''}`;
+                    currentPlayerEl.className = `w-6 h-6 rounded-full ${currentPlayer === 1 ? 'bg-black' : 'bg-white border border-gray-300'} mr-2 piece-shadow`;
+                    playerText.textContent = playerType;
+                }
+                moveCountEl.textContent = moveHistory.length;
+                updateButtonState();
+            }
+            
+            // 更新游戏记录显示
+            function updateGameRecordsDisplay() {
+                const noRecords = document.getElementById('noRecords');
+                const recentRecords = document.getElementById('recentRecords');
+                const statsSummary = document.getElementById('statsSummary');
+                const winsCount = document.getElementById('winsCount');
+                const lossesCount = document.getElementById('lossesCount');
+                
+                if (gameRecords.length === 0) {
+                    noRecords.classList.remove('hidden');
+                    recentRecords.classList.add('hidden');
+                    statsSummary.classList.add('hidden');
+                    viewAllRecordsBtn.classList.add('hidden');
+                    return;
+                }
+                
+                noRecords.classList.add('hidden');
+                recentRecords.classList.remove('hidden');
+                
+                // 清空最近记录
+                recentRecords.innerHTML = '';
+                
+                // 显示最近3条记录
+                const recentGames = gameRecords.slice(0, 3);
+                recentGames.forEach((record, index) => {
+                    const recordEl = document.createElement('div');
+                    recordEl.className = 'flex items-center justify-between text-sm p-2 rounded-lg hover:bg-gray-100';
+                    
+                    let resultText, resultClass, resultIcon;
+                    if (record.winner === 0) {
+                        resultText = '平局';
+                        resultClass = 'text-yellow-600';
+                        resultIcon = 'fa-minus-circle';
+                    } else if (record.playerWon) {
+                        resultText = '胜利';
+                        resultClass = 'text-green-600';
+                        resultIcon = 'fa-check-circle';
+                    } else {
+                        resultText = '失败';
+                        resultClass = 'text-red-600';
+                        resultIcon = 'fa-times-circle';
+                    }
+                    
+                    const minutes = Math.floor(record.gameTime / 60).toString().padStart(2, '0');
+                    const seconds = (record.gameTime % 60).toString().padStart(2, '0');
+                    
+                    recordEl.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs mr-2">${index + 1}</span>
+                            <div>
+                                <div class="font-medium">${record.date.split(' ')[0]}</div>
+                                <div class="text-xs text-gray-500">${minutes}:${seconds} | ${record.moves}步</div>
+                            </div>
+                        </div>
+                        <span class="${resultClass} font-medium">
+                            <i class="fa-solid ${resultIcon} mr-1"></i>${resultText}
+                        </span>
+                    `;
+                    
+                    recentRecords.appendChild(recordEl);
+                });
+                
+                // 显示统计信息（当记录大于等于3场时）
+                if (gameRecords.length >= 3) {
+                    statsSummary.classList.remove('hidden');
+                    const playerWins = gameRecords.filter(r => r.playerWon).length;
+                    const playerLosses = gameRecords.filter(r => r.winner === 2).length;
+                    winsCount.textContent = playerWins;
+                    lossesCount.textContent = playerLosses;
+                    
+                    viewAllRecordsBtn.classList.remove('hidden');
+                } else {
+                    statsSummary.classList.add('hidden');
+                    viewAllRecordsBtn.classList.add('hidden');
+                }
+            }
+            
+            // 更新游戏时间
+            function updateGameTime() {
+                gameTime++;
+                const minutes = Math.floor(gameTime / 60).toString().padStart(2, '0');
+                const seconds = (gameTime % 60).toString().padStart(2, '0');
+                gameTimeEl.textContent = `${minutes}:${seconds}`;
+            }
+            
+            // 开始计时
+            function startTimer() {
+                clearInterval(timerInterval);
+                if (gameActive && !isPaused) {
+                    timerInterval = setInterval(updateGameTime, 1000);
+                }
+            }
+            
+            // 暂停游戏
+            function pauseGame() {
+                if (!gameActive || isPaused) return;
+                
+                isPaused = true;
+                stopTimer();
+                statusText.textContent = '游戏已暂停';
+                updateButtonState();
+            }
+            
+            // 继续游戏
+            function resumeGame() {
+                if (!gameActive || !isPaused) return;
+                
+                isPaused = false;
+                startTimer();
+                const playerType = currentPlayer === 1 ? '黑棋 (您)' : '白棋 (AI)';
+                statusText.textContent = `游戏进行中 - ${playerType}回合${isAITurn ? ' (AI思考中...)' : ''}`;
+                updateButtonState();
+                
+                // 如果继续时是AI回合，触发AI思考
+                if (currentPlayer === 2 && !isAITurn) {
+                    aiMove();
+                }
+            }
+            
+            // 停止计时
+            function stopTimer() {
+                clearInterval(timerInterval);
+            }
+            
+            // 显示胜利模态框
+            function showWinModal(winner) {
+                gameActive = false;
+                stopTimer();
+                
+                const winMessage = document.querySelector('#winModal p.text-gray-600');
+                
+                if (winner === 1) {
+                    winnerText.textContent = '黑棋获胜!';
+                    winMessage.textContent = '恭喜您赢得了这场精彩的比赛!';
+                } else {
+                    winnerText.textContent = '白棋获胜!';
+                    winMessage.textContent = '很遗憾，AI击败了您！再试一次吧！';
+                }
+                
+                // 保存游戏记录
+                const record = {
+                    id: Date.now(),
+                    date: new Date().toLocaleString(),
+                    winner: winner,
+                    gameTime: gameTime,
+                    moves: moveHistory.length,
+                    playerWon: winner === 1
+                };
+                
+                gameRecords.unshift(record);
+                localStorage.setItem('gobangGameRecords', JSON.stringify(gameRecords));
+                
+                // 更新游戏记录显示
+                updateGameRecordsDisplay();
+                
+                winModal.classList.remove('hidden');
+                
+                // 添加动画效果
+                setTimeout(() => {
+                    winModal.classList.add('opacity-100');
+                    winModal.querySelector('div').classList.remove('scale-95');
+                    winModal.querySelector('div').classList.add('scale-100');
+                }, 10);
+            }
+            
+            // 隐藏胜利模态框
+            function hideWinModal() {
+                winModal.classList.remove('opacity-100');
+                winModal.querySelector('div').classList.remove('scale-100');
+                winModal.querySelector('div').classList.add('scale-95');
+                
+                setTimeout(() => {
+                    winModal.classList.add('hidden');
+                }, 300);
+            }
+            
+            // 显示所有记录模态框
+            function showAllRecordsModal() {
+                const modal = document.getElementById('allRecordsModal');
+                const allRecordsList = document.getElementById('allRecordsList');
+                const noRecordsMessage = document.getElementById('noRecordsMessage');
+                const totalRecordsCount = document.getElementById('totalRecordsCount');
+                
+                totalRecordsCount.textContent = gameRecords.length;
+                
+                if (gameRecords.length === 0) {
+                    allRecordsList.innerHTML = '';
+                    noRecordsMessage.classList.remove('hidden');
+                } else {
+                    noRecordsMessage.classList.add('hidden');
+                    allRecordsList.innerHTML = '';
+                    
+                    gameRecords.forEach((record, index) => {
+                        const recordEl = document.createElement('div');
+                        recordEl.className = 'grid grid-cols-1 md:grid-cols-3 gap-4 items-center py-2 hover:bg-gray-50 rounded-lg';
+                        
+                        let resultText, resultClass, resultIcon;
+                        if (record.winner === 0) {
+                            resultText = '平局';
+                            resultClass = 'text-yellow-600 bg-yellow-50';
+                            resultIcon = 'fa-minus-circle';
+                        } else if (record.playerWon) {
+                            resultText = '胜利';
+                            resultClass = 'text-green-600 bg-green-50';
+                            resultIcon = 'fa-check-circle';
+                        } else {
+                            resultText = '失败';
+                            resultClass = 'text-red-600 bg-red-50';
+                            resultIcon = 'fa-times-circle';
+                        }
+                        
+                        const minutes = Math.floor(record.gameTime / 60).toString().padStart(2, '0');
+                        const seconds = (record.gameTime % 60).toString().padStart(2, '0');
+                        
+                        recordEl.innerHTML = `
+                            <div class="flex items-center">
+                                <span class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs mr-2">${index + 1}</span>
+                                <span>${record.date}</span>
+                            </div>
+                            <div class="text-center">
+                                <span class="${resultClass} px-3 py-1 rounded-full text-sm font-medium inline-flex items-center">
+                                    <i class="fa-solid ${resultIcon} mr-1"></i>${resultText}
+                                </span>
+                            </div>
+                            <div class="text-right text-sm">
+                                ${minutes}:${seconds} / ${record.moves}步
+                            </div>
+                        `;
+                        
+                        allRecordsList.appendChild(recordEl);
+                    });
+                }
+                
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.add('opacity-100');
+                    modal.querySelector('div').classList.remove('scale-95');
+                    modal.querySelector('div').classList.add('scale-100');
+                }, 10);
+            }
+            
+            // 隐藏所有记录模态框
+            function hideAllRecordsModal() {
+                const modal = document.getElementById('allRecordsModal');
+                modal.classList.remove('opacity-100');
+                modal.querySelector('div').classList.remove('scale-100');
+                modal.querySelector('div').classList.add('scale-95');
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+            
+            // 清空所有记录
+            function clearAllRecords() {
+                if (confirm('确定要清空所有游戏记录吗？此操作不可恢复。')) {
+                    gameRecords = [];
+                    localStorage.removeItem('gobangGameRecords');
+                    updateGameRecordsDisplay();
+                    hideAllRecordsModal();
+                }
+            }
+
+            // 重置游戏
+            function resetGame() {
+                gameBoard = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+                currentPlayer = 1;
+                gameActive = true;
+                isPaused = false;
+                moveHistory = [];
+                gameTime = 0;
+                isAITurn = false;
+                undoCount = 3; // 重置悔棋次数为3次
+                
+                drawBoard();
+                updateGameStatus();
+                gameTimeEl.textContent = '00:00';
+                
+                stopTimer();
+                startTimer();
+                
+                hideWinModal();
+            }
+            
+            // 悔棋
+            function undoMove() {
+                if (undoCount <= 0 || moveHistory.length === 0 || !gameActive || isPaused) {
+                    return;
+                }
+                
+                // 撤销最后一步（无论是白棋还是黑棋）
+                const lastMove = moveHistory.pop();
+                gameBoard[lastMove.row][lastMove.col] = 0;
+                
+                // 如果撤销的是AI的棋（白棋），且还有用户的棋可以撤销，则再撤销一步用户的棋
+                if (lastMove.player === 2 && moveHistory.length > 0) {
+                    const prevMove = moveHistory.pop();
+                    if (prevMove.player === 1) {
+                        gameBoard[prevMove.row][prevMove.col] = 0;
+                    } else {
+                        // 如果上一步不是用户的棋，放回历史记录
+                        moveHistory.push(prevMove);
+                    }
+                }
+                
+                // 确保回到用户回合
+                currentPlayer = 1;
+                undoCount--; // 减少悔棋次数
+                updateGameStatus();
+                drawBoard();
+            }
+            
+            // AI决策逻辑
+            function aiMove() {
+                if (!gameActive || currentPlayer !== 2 || isPaused) return;
+                
+                isAITurn = true;
+                
+                // 简单的AI策略：优先防守，其次进攻
+                setTimeout(() => {
+                    let bestMove = null;
+                    let bestScore = -Infinity;
+                    
+                    // 评估每个空位
+                    for (let i = 0; i < BOARD_SIZE; i++) {
+                        for (let j = 0; j < BOARD_SIZE; j++) {
+                            if (gameBoard[i][j] === 0) {
+                                // 评估AI在此位置落子的得分
+                                gameBoard[i][j] = 2;
+                                const aiScore = evaluatePosition(i, j, 2);
+                                gameBoard[i][j] = 0;
+                                
+                                // 评估玩家在此位置落子的得分（防守）
+                                gameBoard[i][j] = 1;
+                                const playerScore = evaluatePosition(i, j, 1);
+                                gameBoard[i][j] = 0;
+                                
+                                // 综合得分：防守优先级高于进攻
+                                const score = playerScore * 1.2 + aiScore;
+                                
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestMove = {row: i, col: j};
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 如果没有找到最佳位置（理论上不会发生），随机选择
+                    if (!bestMove) {
+                        const emptyCells = [];
+                        for (let i = 0; i < BOARD_SIZE; i++) {
+                            for (let j = 0; j < BOARD_SIZE; j++) {
+                                if (gameBoard[i][j] === 0) {
+                                    emptyCells.push({row: i, col: j});
+                                }
+                            }
+                        }
+                        if (emptyCells.length > 0) {
+                            bestMove = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                        }
+                    }
+                    
+                    // AI落子
+                    if (bestMove) {
+                        gameBoard[bestMove.row][bestMove.col] = 2;
+                        moveHistory.push({row: bestMove.row, col: bestMove.col, player: 2});
+                        
+                        // 添加落子动画效果
+                        drawBoard();
+                        
+                        // 检查AI是否胜利
+                        if (checkWin(bestMove.row, bestMove.col, 2)) {
+                            showWinModal(2);
+                            isAITurn = false;
+                            return;
+                        }
+                        
+                        // 检查是否平局
+                        if (checkDraw()) {
+                            gameActive = false;
+                            stopTimer();
+                            statusText.textContent = '游戏结束 - 平局!';
+                            isAITurn = false;
+                            return;
+                        }
+                        
+                        // 切换到玩家回合
+                        currentPlayer = 1;
+                        updateGameStatus();
+                    }
+                    
+                    isAITurn = false;
+                }, 800); // AI思考时间
+            }
+            
+            // 评估位置得分
+            function evaluatePosition(row, col, player) {
+                const directions = [
+                    [1, 0],   // 水平
+                    [0, 1],   // 垂直
+                    [1, 1],   // 对角线
+                    [1, -1]   // 反对角线
+                ];
+                
+                let totalScore = 0;
+                
+                for (const [dx, dy] of directions) {
+                    let consecutive = 1;
+                    let blocked = 0;
+                    
+                    // 正向检查
+                    for (let i = 1; i < 5; i++) {
+                        const newRow = row + i * dy;
+                        const newCol = col + i * dx;
+                        
+                        if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) {
+                            blocked++;
+                            break;
+                        }
+                        
+                        if (gameBoard[newRow][newCol] === player) {
+                            consecutive++;
+                        } else if (gameBoard[newRow][newCol] === 0) {
+                            break;
+                        } else {
+                            blocked++;
+                            break;
+                        }
+                    }
+                    
+                    // 反向检查
+                    for (let i = 1; i < 5; i++) {
+                        const newRow = row - i * dy;
+                        const newCol = col - i * dx;
+                        
+                        if (newRow < 0 || newRow >= BOARD_SIZE || newCol < 0 || newCol >= BOARD_SIZE) {
+                            blocked++;
+                            break;
+                        }
+                        
+                        if (gameBoard[newRow][newCol] === player) {
+                            consecutive++;
+                        } else if (gameBoard[newRow][newCol] === 0) {
+                            break;
+                        } else {
+                            blocked++;
+                            break;
+                        }
+                    }
+                    
+                    // 计算得分
+                    if (consecutive >= 5) {
+                        totalScore += 10000; // 五连子
+                    } else if (consecutive === 4) {
+                        if (blocked === 0) totalScore += 1000; // 活四
+                        else if (blocked === 1) totalScore += 500; // 冲四
+                    } else if (consecutive === 3) {
+                        if (blocked === 0) totalScore += 100; // 活三
+                        else if (blocked === 1) totalScore += 50; // 冲三
+                    } else if (consecutive === 2) {
+                        if (blocked === 0) totalScore += 10; // 活二
+                        else if (blocked === 1) totalScore += 5; // 冲二
+                    } else if (consecutive === 1) {
+                        totalScore += 1; // 单子
+                    }
+                }
+                
+                return totalScore;
+            }
+            
+            // 点击棋盘事件
+            canvas.addEventListener('click', (e) => {
+                if (!gameActive || currentPlayer !== 1 || isAITurn) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                // 计算点击的格子坐标
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                
+                const col = Math.round(x / CELL_SIZE);
+                const row = Math.round(y / CELL_SIZE);
+                
+                // 检查坐标是否在棋盘内且为空
+                if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE && gameBoard[row][col] === 0) {
+                    // 用户落子
+                    gameBoard[row][col] = currentPlayer;
+                    moveHistory.push({row, col, player: currentPlayer});
+                    
+                    // 添加落子动画效果
+                    drawBoard();
+                    
+                    // 检查用户是否胜利
+                    if (checkWin(row, col, currentPlayer)) {
+                        showWinModal(currentPlayer);
+                        return;
+                    }
+                    
+                    // 检查是否平局
+                    if (checkDraw()) {
+                        gameActive = false;
+                        stopTimer();
+                        statusText.textContent = '游戏结束 - 平局!';
+                        return;
+                    }
+                    
+                    // 切换到AI回合
+                    currentPlayer = 2;
+                    updateGameStatus();
+                    
+                    // AI思考和落子
+                    aiMove();
+                }
+            });
+            
+            // 鼠标悬停预览效果
+            canvas.addEventListener('mousemove', (e) => {
+                if (!gameActive || currentPlayer !== 1 || isAITurn) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                // 计算鼠标所在的格子坐标
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                
+                const col = Math.round(x / CELL_SIZE);
+                const row = Math.round(y / CELL_SIZE);
+                
+                // 清除之前的预览
+                drawBoard();
+                
+                // 如果坐标在棋盘内且为空，绘制预览棋子
+                if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE && gameBoard[row][col] === 0) {
+                    ctx.beginPath();
+                    ctx.arc(col * CELL_SIZE, row * CELL_SIZE, PIECE_SIZE / 2, 0, Math.PI * 2);
+                    
+                    if (currentPlayer === 1) {
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    } else {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                    }
+                    
+                    ctx.fill();
+                }
+            });
+            
+            // 鼠标离开棋盘时重绘
+            canvas.addEventListener('mouseleave', () => {
+                drawBoard();
+            });
+            
+            // 事件监听
+            restartBtn.addEventListener('click', resetGame);
+            pauseBtn.addEventListener('click', pauseGame);
+            resumeBtn.addEventListener('click', resumeGame);
+            undoBtn.addEventListener('click', undoMove);
+            newGameBtn.addEventListener('click', resetGame);
+            viewAllRecordsBtn.addEventListener('click', showAllRecordsModal);
+            document.getElementById('closeRecordsModal').addEventListener('click', hideAllRecordsModal);
+            document.getElementById('clearRecordsBtn').addEventListener('click', clearAllRecords);
+            document.getElementById('allRecordsModal').addEventListener('click', (e) => {
+                if (e.target.id === 'allRecordsModal') {
+                    hideAllRecordsModal();
+                }
+            });
+            
+            // 初始化游戏
+            drawBoard();
+            updateGameStatus();
+            updateGameRecordsDisplay();
+            startTimer();
+        });
+    </script>
+</body>
+</html>
