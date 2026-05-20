@@ -79,22 +79,22 @@
                         <div class="flex items-center justify-between">
                             <span class="text-gray-600">玩家角色</span>
                             <div class="flex items-center">
-                                <div class="w-6 h-6 rounded-full bg-black mr-2 piece-shadow"></div>
-                                <span>黑棋 (您)</span>
+                                <img src="https://p3-doubao-search-sign.byteimg.com/isp-i18n-media/image/713874d9342e341f6a7cc229840b50b7~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=nxPolhAtONDvUO4kPu8yhVLAqok%3D" class="w-6 h-6 rounded-full mr-2 piece-shadow object-cover" alt="小猫">
+                                <span>小猫 (您)</span>
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-gray-600">AI角色</span>
                             <div class="flex items-center">
-                                <div class="w-6 h-6 rounded-full bg-white border border-gray-300 mr-2 piece-shadow"></div>
-                                <span>白棋 (AI)</span>
+                                <img src="https://p3-doubao-search-sign.byteimg.com/tos-cn-i-qvj2lq49k0/ae316837cef345c8aed07bcc1ad632be~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=kORNu%2FTBhScQOpZ2oF3D1m9A49I%3D" class="w-6 h-6 rounded-full mr-2 piece-shadow object-cover" alt="小兔子">
+                                <span>小兔子 (AI)</span>
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-gray-600">当前回合</span>
                             <div class="flex items-center">
-                                <div id="currentPlayer" class="w-6 h-6 rounded-full bg-black mr-2 piece-shadow"></div>
-                                <span id="playerText">黑棋 (您)</span>
+                                <img id="currentPlayer" src="https://p3-doubao-search-sign.byteimg.com/isp-i18n-media/image/713874d9342e341f6a7cc229840b50b7~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=nxPolhAtONDvUO4kPu8yhVLAqok%3D" class="w-6 h-6 rounded-full mr-2 piece-shadow object-cover" alt="当前玩家">
+                                <span id="playerText">小猫 (您)</span>
                             </div>
                         </div>
                         <div class="flex items-center justify-between">
@@ -231,6 +231,13 @@
             let isAITurn = false;
             let undoCount = 3; // 每回合最多悔棋3次
             
+            // 棋子头像图片
+            const catImage = new Image();
+            catImage.src = 'https://p3-doubao-search-sign.byteimg.com/isp-i18n-media/image/713874d9342e341f6a7cc229840b50b7~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=nxPolhAtONDvUO4kPu8yhVLAqok%3D';
+            
+            const rabbitImage = new Image();
+            rabbitImage.src = 'https://p3-doubao-search-sign.byteimg.com/tos-cn-i-qvj2lq49k0/ae316837cef345c8aed07bcc1ad632be~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=kORNu%2FTBhScQOpZ2oF3D1m9A49I%3D';
+            
             // 游戏记录
             let gameRecords = JSON.parse(localStorage.getItem('gobangGameRecords')) || [];
             
@@ -302,43 +309,49 @@
             function drawPiece(row, col, player) {
                 const x = col * CELL_SIZE;
                 const y = row * CELL_SIZE;
+                const radius = PIECE_SIZE / 2;
                 
                 // 棋子阴影
                 ctx.beginPath();
-                ctx.arc(x, y, PIECE_SIZE / 2 + 2, 0, Math.PI * 2);
+                ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
                 ctx.fill();
                 
-                // 棋子本体
+                // 圆形背景
                 ctx.beginPath();
-                ctx.arc(x, y, PIECE_SIZE / 2, 0, Math.PI * 2);
-                
-                if (player === 1) {
-                    // 黑棋 - 渐变效果
-                    const gradient = ctx.createRadialGradient(
-                        x - PIECE_SIZE / 6, y - PIECE_SIZE / 6, PIECE_SIZE / 10,
-                        x, y, PIECE_SIZE / 2
-                    );
-                    gradient.addColorStop(0, '#555');
-                    gradient.addColorStop(1, '#000');
-                    ctx.fillStyle = gradient;
-                } else {
-                    // 白棋 - 渐变效果
-                    const gradient = ctx.createRadialGradient(
-                        x - PIECE_SIZE / 6, y - PIECE_SIZE / 6, PIECE_SIZE / 10,
-                        x, y, PIECE_SIZE / 2
-                    );
-                    gradient.addColorStop(0, '#fff');
-                    gradient.addColorStop(1, '#ddd');
-                    ctx.fillStyle = gradient;
-                }
-                
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = player === 1 ? '#000' : '#fff';
                 ctx.fill();
-                
-                // 棋子边缘
                 ctx.strokeStyle = player === 1 ? '#333' : '#ccc';
                 ctx.lineWidth = 1;
                 ctx.stroke();
+                
+                // 绘制头像图片
+                const image = player === 1 ? catImage : rabbitImage;
+                const imageSize = radius * 1.8; // 图片大小略小于棋子
+                
+                // 确保图片加载完成
+                if (image.complete) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius - 2, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(
+                        image, 
+                        x - imageSize / 2, 
+                        y - imageSize / 2, 
+                        imageSize, 
+                        imageSize
+                    );
+                    ctx.restore();
+                } else {
+                    // 图片未加载完成时显示文字
+                    ctx.fillStyle = player === 1 ? '#fff' : '#000';
+                    ctx.font = `${radius / 2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(player === 1 ? '猫' : '兔', x, y);
+                }
             }
             
             // 检查胜利条件
@@ -455,9 +468,11 @@
             // 更新游戏状态显示
             function updateGameStatus() {
                 if (gameActive && !isPaused) {
-                    const playerType = currentPlayer === 1 ? '黑棋 (您)' : '白棋 (AI)';
+                    const playerType = currentPlayer === 1 ? '小猫 (您)' : '小兔子 (AI)';
                     statusText.textContent = `游戏进行中 - ${playerType}回合${isAITurn ? ' (AI思考中...)' : ''}`;
-                    currentPlayerEl.className = `w-6 h-6 rounded-full ${currentPlayer === 1 ? 'bg-black' : 'bg-white border border-gray-300'} mr-2 piece-shadow`;
+                    currentPlayerEl.src = currentPlayer === 1 ? 
+                        'https://p3-doubao-search-sign.byteimg.com/isp-i18n-media/image/713874d9342e341f6a7cc229840b50b7~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=nxPolhAtONDvUO4kPu8yhVLAqok%3D' : 
+                        'https://p3-doubao-search-sign.byteimg.com/tos-cn-i-qvj2lq49k0/ae316837cef345c8aed07bcc1ad632be~tplv-be4g95zd3a-image.jpeg?lk3s=feb11e32&x-expires=1794813964&x-signature=kORNu%2FTBhScQOpZ2oF3D1m9A49I%3D';
                     playerText.textContent = playerType;
                 }
                 moveCountEl.textContent = moveHistory.length;
@@ -596,10 +611,10 @@
                 const winMessage = document.querySelector('#winModal p.text-gray-600');
                 
                 if (winner === 1) {
-                    winnerText.textContent = '黑棋获胜!';
+                    winnerText.textContent = '小猫获胜!';
                     winMessage.textContent = '恭喜您赢得了这场精彩的比赛!';
                 } else {
-                    winnerText.textContent = '白棋获胜!';
+                    winnerText.textContent = '小兔子获胜!';
                     winMessage.textContent = '很遗憾，AI击败了您！再试一次吧！';
                 }
                 
